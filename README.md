@@ -16,7 +16,7 @@ This project was born out of a need for a "turnkey" AI solution for the Average 
 
 ## Tech Stack
 * **Runtime:** Node.js (JavaScript)
-* **Bot Framework:** [grammY](https://grammy.dev/)
+* **Bot Framework:** grammY
 * **Database:** PostgreSQL (Hosted on Render)
 * **Frontend/UI:** Cloudflare Pages (Coming Soon)
 * **Infrastructure:** Render (Web Service + DB)
