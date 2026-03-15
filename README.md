@@ -9,7 +9,7 @@ This project was born out of a need for a "turnkey" AI solution for the Average 
 * **Scalable Architecture:** Designed to scale from 1 to 1,000,000 users using Render's infrastructure.
 * **Credit-Gate System:** A built-in "1 DM = 1 Credit" logic to make AI affordable (plan for approx. 1/10th of a cent per message).
 * **Hardened Guardrails:** Pre-built logic to prevent toxicity, racism, and bot-abuse.
-* **Encrypted Brains:** Supports encrypted database columns for System Prompts—keep your secret sauce private while keeping your code open.
+* **Encrypted Brains:** Supports encrypted database columns for System Prompts. Keep your secret sauce private while keeping your code open.
 * **Cloudflare Optimized:** Custom domain support (e.g., suncoastservers.com) with proxied security.
 
 ---
