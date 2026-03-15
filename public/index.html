@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><title>TheTelegramChatBotThatSaysNi</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>TheTelegramChatBotThatSaysNi</h1>
+      <p class="muted">Automate your customer service with efficiency.</p>
+      <hr>
+      <div id="login-container" style="text-align:center;">
+        <script async src="https://telegram.org/js/telegram-widget.js?22" 
+          data-telegram-login="YOUR_BOT_USERNAME" 
+          data-size="large" 
+          data-onauth="onTelegramAuth(user)" 
+          data-request-access="write">
+        </script>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function onTelegramAuth(user) {
+      fetch('/api/tg-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user)
+      }).then(r => r.ok ? window.location.href = '/connected' : alert('Login failed!'));
+    }
+  </script>
+</body>
+</html>
