@@ -1,4 +1,4 @@
-# The Telegram Chatbot That Says Ni
+# TheTelegramChatBotThatSaysNi
 
 An open-source, scalable, and ethically-guarded Telegram chatbot framework built with Node.js, PostgreSQL, and Cloudflare.
 
