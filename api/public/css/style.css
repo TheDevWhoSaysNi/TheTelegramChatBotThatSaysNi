@@ -39,6 +39,16 @@ body {
 h1 { font-size: 20px; margin-bottom: 8px; }
 p { font-size: 14px; line-height: 1.5; }
 .muted { color: var(--text-muted); }
+
+a {
+  color: var(--tg-blue);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
 .btn { 
   display: inline-block;
   min-width: 220px;
@@ -73,11 +83,14 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 10px 25px;
+  border-radius: 50px;
+  min-width: auto;
 }
 
 .github-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   fill: currentColor;
 }
