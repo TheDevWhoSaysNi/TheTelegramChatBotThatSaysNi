@@ -8,18 +8,12 @@
   <div class="container">
     <div class="card">
       <h1>TheTelegramChatBotThatSaysNi</h1>
-      <p class="muted">Log in with your personal Telegram account, then connect your own bot token to let Ni handle your conversations.</p>
+      <p class="muted">Log in with your non-bot Telegram account, then connect your own bot token to let Ni handle your conversations.</p>
       <hr>
       <div id="login-container" style="text-align:center;">
         <!-- Telegram Login widget will be injected by JavaScript using server config -->
       </div>
-      <p class="muted small-link">
-        Not you?
-        <a href="/logout">Clear site session</a>,
-        then open
-        <a href="https://web.telegram.org/" target="_blank" rel="noopener noreferrer">Telegram Web</a>
-        to log out or switch accounts, and return here to log in again.
-      </p>
+      <p id="switch-user-hint" class="muted small-link" style="display:none;"></p>
 
       <div class="footer-links">
         <a href="/instructions.html" class="btn secondary" style="min-width:auto; padding:8px 18px; font-size:12px;" target="_blank" rel="noopener noreferrer">Need help? Click for instructions</a>
@@ -56,6 +50,25 @@
         console.error('Failed to load Telegram Login widget', e);
         document.getElementById('login-container').innerText =
           'Unable to load Telegram Login right now.';
+      }
+    })();
+
+    // Conditionally show "Not you?" helper only when a session exists
+    (async function checkSession() {
+      try {
+        const res = await fetch('/api/me');
+        const me = await res.json();
+        if (!me.loggedIn) return;
+        const el = document.getElementById('switch-user-hint');
+        el.style.display = 'block';
+        el.innerHTML = `
+          Not you? In Telegram, open your "Service Notifications" chat and disconnect this login, then
+          <a href="/logout">clear site session</a>
+          and log in again.
+        `;
+      } catch (e) {
+        // If this fails, just keep the hint hidden
+        console.error('Failed to check session', e);
       }
     })();
 

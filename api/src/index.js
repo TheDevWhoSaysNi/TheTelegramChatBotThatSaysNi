@@ -157,6 +157,15 @@ app.post('/api/save-profile', async (req, res) => {
 });
 
 /**
+ * Session info for frontend
+ */
+app.get('/api/me', (req, res) => {
+  res.json({
+    loggedIn: !!req.session.telegramId || false,
+  });
+});
+
+/**
  * Public config for frontend (non-sensitive)
  */
 app.get('/api/config', (req, res) => {
