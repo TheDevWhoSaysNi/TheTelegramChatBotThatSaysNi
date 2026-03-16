@@ -37,6 +37,7 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS tg_bot_profiles (
       telegram_id BIGINT PRIMARY KEY REFERENCES tg_user_auth(telegram_id),
       display_name TEXT,
+      bot_username TEXT,
       instructions TEXT,
       encrypted_secret_sauce TEXT, 
       updated_at TIMESTAMPTZ DEFAULT NOW()

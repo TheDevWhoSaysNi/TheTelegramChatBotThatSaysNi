@@ -15,9 +15,15 @@
       <form id="profile-form">
         <label>YOUR NAME</label>
         <input type="text" id="name" placeholder="e.g. Sir Robin">
+
+        <label>YOUR BOT USERNAME</label>
+        <input type="text" id="botUsername" placeholder="e.g. MyBusinessBot (no @)">
         
         <label>BOT INSTRUCTIONS</label>
         <textarea id="instructions" rows="5" placeholder="Tell the bot how to behave..."></textarea>
+
+        <label>BOT API TOKEN</label>
+        <input type="password" id="botToken" placeholder="Paste your Telegram bot token from @BotFather">
         
         <button type="submit" class="btn">Save Instructions</button>
       </form>
@@ -34,7 +40,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: document.getElementById('name').value,
-          instructions: document.getElementById('instructions').value
+          instructions: document.getElementById('instructions').value,
+          botUsername: document.getElementById('botUsername').value,
+          botToken: document.getElementById('botToken').value
         })
       });
       if (res.ok) alert('Saved! Ni!');

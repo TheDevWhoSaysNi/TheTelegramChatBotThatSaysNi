@@ -119,16 +119,21 @@ app.post('/api/tg-login', async (req, res) => {
 app.post('/api/save-profile', async (req, res) => {
   if (!req.session.telegramId) return res.status(401).send("Unauthorized");
   
-  const { name, instructions, botToken } = req.body;
+  const { name, instructions, botUsername, botToken } = req.body;
   if (botToken && !process.env.ENCRYPTION_KEY) {
     return res.status(503).json({ error: "Bot token storage not configured (ENCRYPTION_KEY required)." });
   }
   const encryptedToken = botToken ? encrypt(botToken) : null;
 
   await query(
-    `INSERT INTO tg_bot_profiles (telegram_id, display_name, instructions)
-     VALUES ($1, $2, $3) ON CONFLICT (telegram_id) DO UPDATE SET display_name = $2, instructions = $3`,
-    [req.session.telegramId, name, instructions]
+    `INSERT INTO tg_bot_profiles (telegram_id, display_name, bot_username, instructions)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (telegram_id) DO UPDATE
+       SET display_name = $2,
+           bot_username = $3,
+           instructions = $4,
+           updated_at = NOW()`,
+    [req.session.telegramId, name, botUsername || null, instructions]
   );
 
   if (encryptedToken) {
@@ -136,6 +141,15 @@ app.post('/api/save-profile', async (req, res) => {
   }
 
   res.json({ ok: true });
+});
+
+/**
+ * Public config for frontend (non-sensitive)
+ */
+app.get('/api/config', (req, res) => {
+  res.json({
+    telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME || null
+  });
 });
 
 app.get("/logout", (req, res) => {

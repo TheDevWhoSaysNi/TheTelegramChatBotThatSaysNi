@@ -11,17 +11,37 @@
       <p class="muted">Automate your customer service with efficiency.</p>
       <hr>
       <div id="login-container" style="text-align:center;">
-        <script async src="https://telegram.org/js/telegram-widget.js?22" 
-          data-telegram-login="YOUR_BOT_USERNAME" 
-          data-size="large" 
-          data-onauth="onTelegramAuth(user)" 
-          data-request-access="write">
-        </script>
+        <!-- Telegram Login widget will be injected by JavaScript using server config -->
       </div>
     </div>
   </div>
 
   <script>
+    // Inject Telegram Login widget using env-backed config
+    (async function loadTelegramLogin() {
+      try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+        if (!cfg.telegramBotUsername) {
+          document.getElementById('login-container').innerText =
+            'Login is not configured. Ask the admin to set TELEGRAM_LOGIN_BOT_USERNAME.';
+          return;
+        }
+        const script = document.createElement('script');
+        script.async = true;
+        script.src = 'https://telegram.org/js/telegram-widget.js?22';
+        script.setAttribute('data-telegram-login', cfg.telegramBotUsername);
+        script.setAttribute('data-size', 'large');
+        script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+        script.setAttribute('data-request-access', 'write');
+        document.getElementById('login-container').appendChild(script);
+      } catch (e) {
+        console.error('Failed to load Telegram Login widget', e);
+        document.getElementById('login-container').innerText =
+          'Unable to load Telegram Login right now.';
+      }
+    })();
+
     function onTelegramAuth(user) {
       fetch('/api/tg-login', {
         method: 'POST',
