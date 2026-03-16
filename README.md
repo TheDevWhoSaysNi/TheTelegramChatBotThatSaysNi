@@ -33,14 +33,20 @@ Just sign up on [telegramchatbot.suncoastservers.com](https://telegramchatbot.su
 If you want to build your own version of this bot, fork this repo! You can use the core logic to handle your own customer service or personal projects.
 
 ### 2. Environment Variables
-To run this, you will need to set the following on Render:
-* `TELEGRAM_BOT_TOKEN`: Get this from @BotFather.
-* `DATABASE_URL`: Your PostgreSQL connection string.
-* `ENCRYPTION_KEY`: A 32-character string to decrypt the "brains" in your DB.
-* `LLM_API_KEY`: API key from LLM provider of your choice.
+Set these in Render (or in `.env` locally; copy from `api/.env.example`):
+* **TELEGRAM_BOT_TOKEN** — From @BotFather. Powers your primary bot and the Telegram Login widget on the site.
+* **DATABASE_URL** — PostgreSQL connection string (Render provides this if you add a Postgres DB and link it).
+* **ENCRYPTION_KEY** — At least 32 characters. Used to encrypt stored bot tokens and "brains." Required if users save tokens via the hosted site.
+* **SESSION_SECRET** — Random string for signing sessions. **Set this in production** (Render can auto-generate).
+* **LLM_API_KEY** — (Optional) For future LLM integration.
 
 ### 3. Database Setup
-Run the provided SQL scripts in the `/db` folder to initialize the `users` and `credits` tables.
+Tables are created automatically on first run (`tg_user_auth`, `tg_bot_profiles`, `user_sessions`). Ensure `DATABASE_URL` is set (e.g. a Render PostgreSQL instance).
+
+### 4. Deploying on Render
+- **Already have a Web Service + Database?** Just connect this repo to your existing service. Set **Root Directory** to `api`, build `npm install`, start `npm start`. Your existing env vars (e.g. `DATABASE_URL`, `ENCRYPTION_KEY`, `TELEGRAM_BOT_TOKEN`) stay as-is.
+- **Starting from scratch?** Use the repo’s `render.yaml` (Blueprint): in Render choose “New → Blueprint”, connect the repo, and it will create a new Web Service and PostgreSQL. Then set `TELEGRAM_BOT_TOKEN` and `ENCRYPTION_KEY` (32+ chars) in the service environment.
+- For the **Telegram Login** widget on the hosted site, replace `YOUR_BOT_USERNAME` in `api/public/index.html` with your bot’s @username (e.g. `MyNiBot`).
 
 ---
 

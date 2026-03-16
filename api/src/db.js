@@ -16,15 +16,20 @@ async function query(text, params) {
 }
 
 async function initDb() {
-  // Main User & Auth Table
+  // Main User & Auth Table (bot_token stores AES-256 encrypted token for hosted users)
   await query(`
     CREATE TABLE IF NOT EXISTS tg_user_auth (
       telegram_id BIGINT PRIMARY KEY,
       username TEXT,
       credits INTEGER DEFAULT 10,
+      bot_token TEXT,
       secret_unlocked BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
+  `);
+  // Add bot_token if table already existed without it (migration-safe)
+  await query(`
+    ALTER TABLE tg_user_auth ADD COLUMN IF NOT EXISTS bot_token TEXT;
   `);
 
   // Bot Configuration Table (Encrypted)
@@ -41,4 +46,4 @@ async function initDb() {
   console.log("Database initialized. All tables are ready for Ni!");
 }
 
-module.exports = { query, initDb };
+module.exports = { query, initDb, pool };
