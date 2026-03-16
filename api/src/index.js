@@ -33,6 +33,17 @@ app.use(session({
 
 const activeBots = new Map();
 
+function attachBotErrorHandling(botInstance, label) {
+  botInstance.catch((err) => {
+    // Ignore harmless 409 conflicts when another long-polling instance was running
+    if (err.error && err.error.error_code === 409) {
+      console.warn(`Ni! ${label} received 409 conflict from Telegram (duplicate getUpdates). Ignoring.`);
+      return;
+    }
+    console.error(`Ni! ${label} bot error:`, err);
+  });
+}
+
 /**
  * Handle bot events
  */
@@ -64,6 +75,7 @@ async function startAllBots() {
   if (process.env.TELEGRAM_BOT_TOKEN) {
     const mainBot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
     await setupBotHandlers(mainBot);
+    attachBotErrorHandling(mainBot, "Primary");
     mainBot.start();
     console.log("Ni! Primary Bot is live.");
   }
@@ -77,6 +89,7 @@ async function startAllBots() {
       if (!decryptedToken) continue;
       const userBot = new Bot(decryptedToken);
       await setupBotHandlers(userBot);
+      attachBotErrorHandling(userBot, `User ${row.telegram_id}`);
       userBot.start();
       activeBots.set(row.telegram_id, userBot);
       console.log(`Ni! Started Bot for User: ${row.telegram_id}`);
