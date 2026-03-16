@@ -43,6 +43,10 @@ async function initDb() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  // Migration: add bot_username if table was created before it existed
+  await query(`
+    ALTER TABLE tg_bot_profiles ADD COLUMN IF NOT EXISTS bot_username TEXT;
+  `);
 
   console.log("Database initialized. All tables are ready for Ni!");
 }

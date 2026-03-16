@@ -218,30 +218,38 @@ app.post('/api/tg-login', async (req, res) => {
  * Encrypted Profile Saving
  */
 app.post('/api/save-profile', async (req, res) => {
-  if (!req.session.telegramId) return res.status(401).send("Unauthorized");
-  
-  const { name, instructions, botUsername, botToken } = req.body;
-  if (botToken && !process.env.ENCRYPTION_KEY) {
-    return res.status(503).json({ error: "Bot token storage not configured (ENCRYPTION_KEY required)." });
+  if (!req.session.telegramId) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const { name, instructions, botUsername, botToken } = req.body || {};
+    if (botToken && !process.env.ENCRYPTION_KEY) {
+      return res.status(503).json({ error: "Bot token storage not configured (ENCRYPTION_KEY required)." });
+    }
+    const encryptedToken = botToken ? encrypt(botToken) : null;
+
+    await query(
+      `INSERT INTO tg_bot_profiles (telegram_id, display_name, bot_username, instructions)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (telegram_id) DO UPDATE
+         SET display_name = $2,
+             bot_username = $3,
+             instructions = $4,
+             updated_at = NOW()`,
+      [req.session.telegramId, name || null, botUsername || null, instructions || null]
+    );
+
+    if (encryptedToken) {
+      await query(`UPDATE tg_user_auth SET bot_token = $1 WHERE telegram_id = $2`, [encryptedToken, req.session.telegramId]);
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Ni! save-profile error:", err);
+    return res.status(500).json({
+      error: "Failed to save profile. Check server logs.",
+      details: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
-  const encryptedToken = botToken ? encrypt(botToken) : null;
-
-  await query(
-    `INSERT INTO tg_bot_profiles (telegram_id, display_name, bot_username, instructions)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (telegram_id) DO UPDATE
-       SET display_name = $2,
-           bot_username = $3,
-           instructions = $4,
-           updated_at = NOW()`,
-    [req.session.telegramId, name, botUsername || null, instructions]
-  );
-
-  if (encryptedToken) {
-    await query(`UPDATE tg_user_auth SET bot_token = $1 WHERE telegram_id = $2`, [encryptedToken, req.session.telegramId]);
-  }
-
-  res.json({ ok: true });
 });
 
 /**

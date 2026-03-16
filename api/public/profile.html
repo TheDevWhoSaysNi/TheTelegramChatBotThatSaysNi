@@ -55,7 +55,12 @@
           botToken: document.getElementById('botToken').value
         })
       });
-      if (res.ok) alert('Saved! Ni!');
+      if (res.ok) {
+        alert('Saved! Ni!');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert('Save failed: ' + (data.error || res.statusText));
+      }
     };
   </script>
 </body>
