@@ -152,6 +152,15 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+// Simple HTML routes for static pages so paths like /connected work
+app.get("/connected", (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "connected.html"));
+});
+
+app.get("/profile", (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "profile.html"));
+});
+
 app.get("/logout", (req, res) => {
   req.session.destroy(() => res.redirect("/"));
 });
