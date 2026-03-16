@@ -21,7 +21,7 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS tg_user_auth (
       telegram_id BIGINT PRIMARY KEY,
       username TEXT,
-      credits INTEGER DEFAULT 10,
+      credits INTEGER DEFAULT 100,
       bot_token TEXT,
       secret_unlocked BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMPTZ DEFAULT NOW()

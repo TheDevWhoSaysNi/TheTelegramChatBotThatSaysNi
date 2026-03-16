@@ -7,9 +7,15 @@ const path = require("path");
 const { Bot } = require("grammy");
 const { query, initDb, pool } = require("./db");
 const { encrypt, decrypt } = require("./utils/encryption");
+const { callClaude } = require("./utils/claude");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Open-source default prompt. Forkers can fill this with their own
+// non-secret system instructions. Leave as "" to rely solely on
+// per-user instructions and encrypted_secret_sauce from the database.
+const OPEN_SOURCE_DEFAULT_PROMPT = "";
 
 // Middleware
 app.use(express.json());
@@ -46,15 +52,17 @@ function attachBotErrorHandling(botInstance, label) {
 
 /**
  * Handle bot events
+ * @param {{ chargeCredits?: boolean }} options
  */
-async function setupBotHandlers(botInstance) {
+async function setupBotHandlers(botInstance, options = {}) {
+  const chargeCredits = options.chargeCredits !== undefined ? options.chargeCredits : true;
   botInstance.command("start", async (ctx) => {
     const telegramId = ctx.from.id;
     const username = ctx.from.username || "Guest";
 
     const userRes = await query(
       `INSERT INTO tg_user_auth (telegram_id, username, credits) 
-       VALUES ($1, $2, 10) ON CONFLICT (telegram_id) DO UPDATE SET username = $2
+       VALUES ($1, $2, 100) ON CONFLICT (telegram_id) DO UPDATE SET username = $2
        RETURNING credits`, [telegramId, username]
     );
 
@@ -62,8 +70,85 @@ async function setupBotHandlers(botInstance) {
   });
 
   botInstance.on("message:text", async (ctx) => {
-    const text = ctx.message.text.trim();
+    const text = ctx.message.text?.trim();
+    if (!text) return;
 
+    const telegramId = ctx.from.id;
+
+    try {
+      // Fetch user profile, instructions, and credits
+      const { rows } = await query(
+        `SELECT u.credits,
+                p.instructions,
+                p.encrypted_secret_sauce
+         FROM tg_user_auth u
+         LEFT JOIN tg_bot_profiles p ON p.telegram_id = u.telegram_id
+         WHERE u.telegram_id = $1`,
+        [telegramId]
+      );
+
+      if (!rows.length) {
+        await ctx.reply("Ni! You are not registered yet. Send /start first.");
+        return;
+      }
+
+      const user = rows[0];
+      if (chargeCredits) {
+        if (user.credits <= 0) {
+          await ctx.reply("Ni! You are out of credits. Please top up to continue chatting.");
+          return;
+        }
+      }
+
+      // Compose system prompt
+      const systemParts = [];
+      if (OPEN_SOURCE_DEFAULT_PROMPT) systemParts.push(OPEN_SOURCE_DEFAULT_PROMPT);
+
+      // Encrypted secret sauce per user/host (optional)
+      if (user.encrypted_secret_sauce) {
+        try {
+          const secret = decrypt(user.encrypted_secret_sauce);
+          if (secret) systemParts.push(secret);
+        } catch {
+          // ignore decryption issues for optional field
+        }
+      }
+
+      // User instructions from profile (if any)
+      if (user.instructions) {
+        systemParts.push(`User profile instructions:\n${user.instructions}`);
+      }
+
+      const systemPrompt = systemParts.join("\n\n").trim() || undefined;
+
+      // Call Claude
+      const replyText = await callClaude({
+        systemPrompt,
+        userText: text,
+      });
+
+      if (!replyText) {
+        await ctx.reply("Ni! Claude did not return a response. Please try again.");
+        return;
+      }
+
+      // Decrement credits only for hosted (primary) bot usage
+      if (chargeCredits) {
+        await query(
+          "UPDATE tg_user_auth SET credits = GREATEST(credits - 1, 0) WHERE telegram_id = $1",
+          [telegramId]
+        );
+      }
+
+      await ctx.reply(replyText);
+    } catch (err) {
+      console.error("Ni! Error handling message:", err);
+      if (err.message && err.message.includes("ANTHROPIC_API_KEY")) {
+        await ctx.reply("Ni! LLM is not configured. Ask the admin to set ANTHROPIC_API_KEY on the server.");
+      } else {
+        await ctx.reply("Ni! Something went wrong talking to the LLM. Please try again later.");
+      }
+    }
   });
 }
 
@@ -74,7 +159,8 @@ async function startAllBots() {
   // 1. Primary Environment Bot
   if (process.env.TELEGRAM_BOT_TOKEN) {
     const mainBot = new Bot(process.env.TELEGRAM_BOT_TOKEN);
-    await setupBotHandlers(mainBot);
+    // Hosted primary bot: charges credits because you pay for the LLM
+    await setupBotHandlers(mainBot, { chargeCredits: true });
     attachBotErrorHandling(mainBot, "Primary");
     mainBot.start();
     console.log("Ni! Primary Bot is live.");
@@ -88,7 +174,9 @@ async function startAllBots() {
       const decryptedToken = decrypt(row.bot_token);
       if (!decryptedToken) continue;
       const userBot = new Bot(decryptedToken);
-      await setupBotHandlers(userBot);
+      // User-contributed bots: users bring their own Telegram token (and eventually LLM key),
+      // so we do NOT charge credits here.
+      await setupBotHandlers(userBot, { chargeCredits: false });
       attachBotErrorHandling(userBot, `User ${row.telegram_id}`);
       userBot.start();
       activeBots.set(row.telegram_id, userBot);
