@@ -52,10 +52,14 @@ function attachBotErrorHandling(botInstance, label) {
 
 /**
  * Handle bot events
- * @param {{ chargeCredits?: boolean }} options
+ * @param {{ chargeCredits?: boolean, ownerTelegramId?: number }} options
+ *   - chargeCredits: whether to deduct credits (false for user-contributed bots)
+ *   - ownerTelegramId: when set, profile/instructions are taken from this user (the bot owner), not the message sender
  */
 async function setupBotHandlers(botInstance, options = {}) {
   const chargeCredits = options.chargeCredits !== undefined ? options.chargeCredits : true;
+  const ownerTelegramId = options.ownerTelegramId;
+
   botInstance.command("start", async (ctx) => {
     const telegramId = ctx.from.id;
     const username = ctx.from.username || "Guest";
@@ -73,10 +77,11 @@ async function setupBotHandlers(botInstance, options = {}) {
     const text = ctx.message.text?.trim();
     if (!text) return;
 
-    const telegramId = ctx.from.id;
+    // For user-contributed bots, use the owner's profile (who registered the bot). Otherwise use the message sender.
+    const profileTelegramId = ownerTelegramId != null ? ownerTelegramId : ctx.from.id;
 
     try {
-      // Fetch user profile, instructions, and credits
+      // Fetch user profile, instructions, and credits (by profile owner for user bots, by sender for primary bot)
       const { rows } = await query(
         `SELECT u.credits,
                 p.instructions,
@@ -84,7 +89,7 @@ async function setupBotHandlers(botInstance, options = {}) {
          FROM tg_user_auth u
          LEFT JOIN tg_bot_profiles p ON p.telegram_id = u.telegram_id
          WHERE u.telegram_id = $1`,
-        [telegramId]
+        [profileTelegramId]
       );
 
       if (!rows.length) {
@@ -93,6 +98,7 @@ async function setupBotHandlers(botInstance, options = {}) {
       }
 
       const user = rows[0];
+      // For primary bot, charge the message sender. For user bots, we use owner's profile but don't charge.
       if (chargeCredits) {
         if (user.credits <= 0) {
           await ctx.reply("Ni! You are out of credits. Please top up to continue chatting.");
@@ -132,11 +138,11 @@ async function setupBotHandlers(botInstance, options = {}) {
         return;
       }
 
-      // Decrement credits only for hosted (primary) bot usage
+      // Decrement credits only for hosted (primary) bot usage (use profile owner for consistency)
       if (chargeCredits) {
         await query(
           "UPDATE tg_user_auth SET credits = GREATEST(credits - 1, 0) WHERE telegram_id = $1",
-          [telegramId]
+          [profileTelegramId]
         );
       }
 
@@ -174,9 +180,8 @@ async function startAllBots() {
       const decryptedToken = decrypt(row.bot_token);
       if (!decryptedToken) continue;
       const userBot = new Bot(decryptedToken);
-      // User-contributed bots: users bring their own Telegram token (and eventually LLM key),
-      // so we do NOT charge credits here.
-      await setupBotHandlers(userBot, { chargeCredits: false });
+      // User-contributed bots: use owner's profile/instructions for all chatters; do not charge credits.
+      await setupBotHandlers(userBot, { chargeCredits: false, ownerTelegramId: row.telegram_id });
       attachBotErrorHandling(userBot, `User ${row.telegram_id}`);
       userBot.start();
       activeBots.set(row.telegram_id, userBot);
@@ -259,6 +264,29 @@ app.get('/api/me', (req, res) => {
   res.json({
     loggedIn: !!req.session.telegramId || false,
   });
+});
+
+/**
+ * Get current user's profile for editing (no token returned)
+ */
+app.get('/api/profile', async (req, res) => {
+  if (!req.session.telegramId) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const { rows } = await query(
+      `SELECT display_name, bot_username, instructions
+       FROM tg_bot_profiles WHERE telegram_id = $1`,
+      [req.session.telegramId]
+    );
+    const p = rows[0] || {};
+    return res.json({
+      name: p.display_name || "",
+      botUsername: p.bot_username || "",
+      instructions: p.instructions || "",
+    });
+  } catch (err) {
+    console.error("Ni! get profile error:", err);
+    return res.status(500).json({ error: "Failed to load profile." });
+  }
 });
 
 /**

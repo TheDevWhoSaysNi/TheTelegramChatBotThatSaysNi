@@ -43,6 +43,20 @@
   </div>
 
   <script>
+    // Load saved profile into form when page opens
+    (async function loadProfile() {
+      try {
+        const res = await fetch('/api/profile');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('name').value = data.name || '';
+        document.getElementById('botUsername').value = data.botUsername || '';
+        document.getElementById('instructions').value = data.instructions || '';
+      } catch (e) {
+        console.error('Failed to load profile', e);
+      }
+    })();
+
     document.getElementById('profile-form').onsubmit = async (e) => {
       e.preventDefault();
       const res = await fetch('/api/save-profile', {
