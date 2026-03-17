@@ -12,7 +12,12 @@
   <div class="container">
     <div class="card">
       <h1>Bot Profile</h1>
-      <p class="muted">These settings control how your bot behaves when TheTelegramChatBotThatSaysNi replies for you. You can safely paste your bot token here. It is handled with AES-256 encryption.</p>
+      <p class="muted">These settings control how your bot behaves. You can use it in two ways:</p>
+      <ul class="muted" style="text-align:left; font-size:13px; margin:8px 0 16px;">
+        <li><strong>Direct:</strong> People open a chat with your bot and get replies there.</li>
+        <li><strong>Telegram Business (Premium):</strong> Connect this bot in Telegram under <em>Settings → Telegram Business → Chatbots</em>. The bot will then reply in DMs to your account on your behalf (customers message you; the bot answers as you).</li>
+      </ul>
+      <p class="muted">You can safely paste your bot token here; it is stored with AES-256 encryption.</p>
       <form id="profile-form" style="margin-bottom: 10px;">
         <label>YOUR NAME</label>
         <input type="text" id="name" placeholder="e.g. Sir Robin">

@@ -64,12 +64,22 @@ async function setupBotHandlers(botInstance, options = {}) {
     const telegramId = ctx.from.id;
     const username = ctx.from.username || "Guest";
 
+    // User-contributed bot: only the owner gets "account" treatment; everyone else is just a chatter (no DB row, no credits message)
+    if (ownerTelegramId != null) {
+      if (telegramId === ownerTelegramId) {
+        await ctx.reply("Ni! Your bot is set up. Anyone who messages this bot will get your Ni replies. (No credits used for this bot.)");
+        return;
+      }
+      await ctx.reply("Ni! Send me a message.");
+      return;
+    }
+
+    // Primary (hosted) bot: everyone who /start gets a row and sees credits
     const userRes = await query(
       `INSERT INTO tg_user_auth (telegram_id, username, credits) 
        VALUES ($1, $2, 100) ON CONFLICT (telegram_id) DO UPDATE SET username = $2
        RETURNING credits`, [telegramId, username]
     );
-
     await ctx.reply(`Ni! Account linked. Credits: ${userRes.rows[0].credits}`);
   });
 
@@ -156,6 +166,65 @@ async function setupBotHandlers(botInstance, options = {}) {
       }
     }
   });
+
+  // Telegram Business: when someone DMs the account that connected this bot, reply on their behalf (no credits)
+  botInstance.on("business_message", async (ctx) => {
+    let conn;
+    try {
+      conn = await ctx.getBusinessConnection();
+    } catch (e) {
+      console.error("Ni! business_message getBusinessConnection:", e);
+      return;
+    }
+    if (!conn || !conn.user) return;
+    // Only reply to messages from customers, not when the business account owner types
+    if (ctx.from.id === conn.user.id) return;
+
+    const text = ctx.msg?.text?.trim();
+    if (!text) return;
+
+    const businessOwnerId = conn.user.id;
+
+    try {
+      const { rows } = await query(
+        `SELECT p.instructions, p.encrypted_secret_sauce
+         FROM tg_user_auth u
+         LEFT JOIN tg_bot_profiles p ON p.telegram_id = u.telegram_id
+         WHERE u.telegram_id = $1`,
+        [businessOwnerId]
+      );
+      if (!rows.length) {
+        await ctx.reply("Ni! This business account is not set up yet. Link it on the website first.");
+        return;
+      }
+
+      const user = rows[0];
+      const systemParts = [];
+      if (OPEN_SOURCE_DEFAULT_PROMPT) systemParts.push(OPEN_SOURCE_DEFAULT_PROMPT);
+      if (user.encrypted_secret_sauce) {
+        try {
+          const secret = decrypt(user.encrypted_secret_sauce);
+          if (secret) systemParts.push(secret);
+        } catch { /* ignore */ }
+      }
+      if (user.instructions) systemParts.push(`User profile instructions:\n${user.instructions}`);
+      const systemPrompt = systemParts.join("\n\n").trim() || undefined;
+
+      const replyText = await callClaude({ systemPrompt, userText: text });
+      if (!replyText) {
+        await ctx.reply("Ni! No response from the LLM. Try again.");
+        return;
+      }
+      await ctx.reply(replyText);
+    } catch (err) {
+      console.error("Ni! Business message error:", err);
+      if (err.message && err.message.includes("ANTHROPIC_API_KEY")) {
+        await ctx.reply("Ni! LLM is not configured.");
+      } else {
+        await ctx.reply("Ni! Something went wrong. Please try again.");
+      }
+    }
+  });
 }
 
 /**
@@ -168,7 +237,9 @@ async function startAllBots() {
     // Hosted primary bot: charges credits because you pay for the LLM
     await setupBotHandlers(mainBot, { chargeCredits: true });
     attachBotErrorHandling(mainBot, "Primary");
-    mainBot.start();
+    mainBot.start({
+      allowed_updates: ["message", "edited_message", "business_message", "edited_business_message", "business_connection"],
+    });
     console.log("Ni! Primary Bot is live.");
   }
 
@@ -183,7 +254,9 @@ async function startAllBots() {
       // User-contributed bots: use owner's profile/instructions for all chatters; do not charge credits.
       await setupBotHandlers(userBot, { chargeCredits: false, ownerTelegramId: row.telegram_id });
       attachBotErrorHandling(userBot, `User ${row.telegram_id}`);
-      userBot.start();
+      userBot.start({
+        allowed_updates: ["message", "edited_message", "business_message", "edited_business_message", "business_connection"],
+      });
       activeBots.set(row.telegram_id, userBot);
       console.log(`Ni! Started Bot for User: ${row.telegram_id}`);
     } catch (e) {
